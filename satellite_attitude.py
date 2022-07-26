@@ -4,29 +4,75 @@ import numpy as np
 import math
 # Inital setting
 
-def M(t):
-    Mx = 0.2*math.sin(2*math.pi/300*t + 0.5*math.pi) + 0.1*math.cos(2*math.pi/200 * t + math.pi)
-    My = 0.05*math.sin(2*math.pi/500*t + 1.5*math.pi) + 0.1*math.cos(2*math.pi/400 * t + 0.5*math.pi)
-    Mz = 0.01*math.sin(2*math.pi/300*t) #양수의 토크를 주었더니 시계방향으로 회전(-축으로 회전)
+def error_quaternion_matrix(q):
+    q1, q2, q3, q4 = np.transpose(q)[0]
 
-    return np.array([[Mx],[My],[Mz]])
+    return np.array([[q4, q3, -q2, -q1],
+                     [-q3, q4, q1, -q2],
+                     [q2, -q1, q4, -q3],
+                     [q1, q2, q3, q4]])
 
+def M(t, w, q):
+    new = np.array([[1,1,1],[1,1,1],[1,1,1]])
+    test = np.array([1,0,0]).T.reshape(3,1)
 
-def f_v(t, w):
+    d = 0.2
+    k = 0.5
+
+    w1, w2, w3 = np.transpose(w)[0]
+    omega = np.array([[0, -w3, w2],
+                      [w3, 0, -w1],
+                      [-w2, w1, 0]])
+
+    qe = (target_quaternion@q)[0:3,0].reshape(3,1)
+
+    return -k*I@qe - d*I@w -omega@I@w#  #+ extern_m
+'''
+def f_v(t, w, q):
     trans_w = np.transpose(w)
     trans_h = np.transpose(I@w)
     res = np.cross(trans_w, trans_h)
 
-    return I_inv@(M(t) - np.transpose(res))
+    return I_inv@(M(t, w, q) - np.transpose(res))
+'''
+def f_v(t, w, q):
+    w1, w2, w3 = np.transpose(w)[0]
+    omega = np.array([[0, -w3, w2],
+                      [w3, 0, -w1],
+                      [-w2, w1, 0]])
+    '''
+    print('s')
+    print(omega.shape)
+    print(I.shape)
+    print(w.shape)
+    print((omega@I@w).shape)
+    '''
+    return I_inv@(omega@I@w + M(t, w, q))
 
+'''    
 def f_q(t, q, w):
     w1, w2, w3 = np.transpose(w)[0]
-    omega = np.array([[0, w3, -w2, w1],
-                      [-w3, 0, w1, w2],
-                      [w2, -w1, 0, w3],
+    omega = np.array([[0, -w3, w2, w1],
+                      [w3, 0, -w1, w2],
+                      [-w2, w1, 0, w3],
                       [-w1, -w2, -w3, 0]])
     
     return 1/2*omega@q
+    
+'''
+
+def f_q(t, q, w):
+    w1, w2, w3 = np.transpose(w)[0]
+
+    omega = np.array([[0, -w3, w2],
+                      [w3, 0, -w1],
+                      [-w2, w1, 0]])
+
+    a = 1/2*omega@q[0:3,0] + 1/2*q[3,0]*w
+    q_dot = np.array([a[0,0],a[1,0],a[2,0],(-1/2*(w.T)@q[0:3,0])[0]]).T.reshape(4,1)
+
+    return q_dot
+    
 
 def e_t_q(li):
     a, b, c = li
@@ -53,10 +99,10 @@ def q_t_d(li):
 
 
 def rungekutha(t, w, q, h):
-    k1 = h * f_v(t, w)
-    k2 = h * f_v((t+h/2), (w + k1/2))
-    k3 = h * f_v((t+h/2), (w + k2/2))
-    k4 = h * f_v((t+h), (w + k3))
+    k1 = h * f_v(t, w, q)
+    k2 = h * f_v((t+h/2), (w + k1/2), q)
+    k3 = h * f_v((t+h/2), (w + k2/2), q)
+    k4 = h * f_v((t+h), (w + k3), q)
     
     new_w = w + (k1 + 2*k2 + 2*k3 + k4) / 6
 
@@ -76,9 +122,11 @@ def unveal(li):
 
     return new_li
 
+target_quaternion = error_quaternion_matrix(e_t_q(np.array([[math.pi*30/180],[0],[math.pi*20/180]])))
+print(e_t_q(np.array([[math.pi*30/180],[0],[0]])))
 
 I = np.array([[128.22, 0.26, -0.11],[0.26, 131.81, 0.74],[-0.11, 0.74, 71.93]])
-#I = np.array([[100,0,0],[0,100,0],[0,0,100]])
+#I = np.array([[120,0,0],[0,100,0],[0,0,80]])
 I_inv = np.linalg.inv(I)
 
 t = 0
@@ -86,12 +134,12 @@ tend = 300
 h = 0.01
 time = [0]
 
-inital_dcm = q_t_d(e_t_q(np.array([[math.pi*30/180],[0],[math.pi*20/180]])))
 a = np.array([[1,0,0],[0,1,0],[0,0,1]])
 
-quaternion = [e_t_q(np.array([[math.pi*30/180],[0],[math.pi*20/180]]))]
-anguler_velocity = [np.array([[math.pi*0.1/180],[0.0],[0.0]])]
-dcm = []
+quaternion = [e_t_q(np.array([[0],[0],[0]]))]
+anguler_velocity = [np.array([[0.0],[0.0],[0.0]])]
+dcm = [q_t_d(quaternion[0])]
+
 
 #implementation
 
@@ -101,7 +149,6 @@ while time[-1] < tend:
     q = quaternion[-1]
 
     #print()
-
     new_w, new_q = rungekutha(t, w, q, h)
     q_norm = (new_q[0] ** 2 + new_q[1] ** 2 + new_q[2] ** 2 + new_q[3] ** 2)**(1/2)
     new_q = new_q/q_norm
@@ -115,7 +162,7 @@ while time[-1] < tend:
 anguler_velocity and qurter
 '''    
 
-fig, ax = plt.subplots(3,1,figsize=(15, 7), layout='constrained')
+fig, ax = plt.subplots(2,1,figsize=(15, 7), layout='constrained')
 
 new_av = []
 
@@ -169,16 +216,15 @@ ax_ani.set_zlim(-1,1)
 ax_ani.set_xticks([])
 ax_ani.set_yticks([])
 ax_ani.set_zticks([])
-ax_ani.set_xlabel("X")
-ax_ani.set_ylabel("Y")
+ax_ani.set_xlabel("Y")
+ax_ani.set_ylabel("X")
 ax_ani.set_zlabel("Z")
 ax_ani.view_init(30,-45)
 
 line3d = []
-col = ['red','blue','green']
-lab = ['x','y','z']
+col = ['red','green','blue']
 for i in range(3):
-    line3d.append(ax_ani.plot([0, 0], [0, 0] ,zs = [0, 0], color = col[i], label = lab[i])[0])
+    line3d.append(ax_ani.plot([0, 0], [0, 0] ,zs = [0, 0], color = col[i])[0])
 
 anim = FuncAnimation(fig_ani, animate, frames=dcm[::10], interval = 10)
 #anim.save('trajectory.gif', writer='imagemagick', fps=30, dpi=100)
