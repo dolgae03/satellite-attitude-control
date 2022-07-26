@@ -13,9 +13,6 @@ def error_quaternion_matrix(q):
                      [q1, q2, q3, q4]])
 
 def M(t, w, q):
-    new = np.array([[1,1,1],[1,1,1],[1,1,1]])
-    test = np.array([1,0,0]).T.reshape(3,1)
-
     d = 0.2
     k = 0.5
 
@@ -24,55 +21,27 @@ def M(t, w, q):
                       [w3, 0, -w1],
                       [-w2, w1, 0]])
 
-    qe = (target_quaternion@q)[0:3,0].reshape(3,1)
+    qe = (target_quaternion@q)[0:3,0:1]
 
-    return -k*I@qe - d*I@w -omega@I@w#  #+ extern_m
-'''
+    return -k*I@qe - d*I@w -omega@I@w
+
 def f_v(t, w, q):
     trans_w = np.transpose(w)
     trans_h = np.transpose(I@w)
     res = np.cross(trans_w, trans_h)
 
     return I_inv@(M(t, w, q) - np.transpose(res))
-'''
-def f_v(t, w, q):
-    w1, w2, w3 = np.transpose(w)[0]
-    omega = np.array([[0, -w3, w2],
-                      [w3, 0, -w1],
-                      [-w2, w1, 0]])
-    '''
-    print('s')
-    print(omega.shape)
-    print(I.shape)
-    print(w.shape)
-    print((omega@I@w).shape)
-    '''
-    return I_inv@(omega@I@w + M(t, w, q))
 
-'''    
+  
 def f_q(t, q, w):
     w1, w2, w3 = np.transpose(w)[0]
-    omega = np.array([[0, -w3, w2, w1],
-                      [w3, 0, -w1, w2],
-                      [-w2, w1, 0, w3],
+    omega = np.array([[0, w3, -w2, w1],
+                      [-w3, 0, w1, w2],
+                      [w2, -w1, 0, w3],
                       [-w1, -w2, -w3, 0]])
     
     return 1/2*omega@q
-    
-'''
-
-def f_q(t, q, w):
-    w1, w2, w3 = np.transpose(w)[0]
-
-    omega = np.array([[0, -w3, w2],
-                      [w3, 0, -w1],
-                      [-w2, w1, 0]])
-
-    a = 1/2*omega@q[0:3,0] + 1/2*q[3,0]*w
-    q_dot = np.array([a[0,0],a[1,0],a[2,0],(-1/2*(w.T)@q[0:3,0])[0]]).T.reshape(4,1)
-
-    return q_dot
-    
+  
 
 def e_t_q(li):
     a, b, c = li
@@ -122,8 +91,10 @@ def unveal(li):
 
     return new_li
 
-target_quaternion = error_quaternion_matrix(e_t_q(np.array([[math.pi*30/180],[0],[math.pi*20/180]])))
-print(e_t_q(np.array([[math.pi*30/180],[0],[0]])))
+tar = e_t_q(np.array([[math.pi*30/180],[0],[math.pi*20/180]]))
+target_quaternion = error_quaternion_matrix(tar)
+
+print(tar)
 
 I = np.array([[128.22, 0.26, -0.11],[0.26, 131.81, 0.74],[-0.11, 0.74, 71.93]])
 #I = np.array([[120,0,0],[0,100,0],[0,0,80]])
@@ -158,9 +129,8 @@ while time[-1] < tend:
     dcm.append(q_t_d(new_q))
     time.append(t+h)
 
-'''
-anguler_velocity and qurter
-'''    
+
+print(quaternion[-1])
 
 fig, ax = plt.subplots(2,1,figsize=(15, 7), layout='constrained')
 
