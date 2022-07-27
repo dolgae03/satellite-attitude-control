@@ -110,6 +110,7 @@ a = np.array([[1,0,0],[0,1,0],[0,0,1]])
 quaternion = [e_t_q(np.array([[0],[0],[0]]))]
 anguler_velocity = [np.array([[0.0],[0.0],[0.0]])]
 dcm = [q_t_d(quaternion[0])]
+torque = [M(t, anguler_velocity[-1],quaternion[-1])]
 
 
 #implementation
@@ -128,11 +129,12 @@ while time[-1] < tend:
     quaternion.append(new_q)
     dcm.append(q_t_d(new_q))
     time.append(t+h)
+    torque.append(M(t, new_w, new_q))
 
 
 print(quaternion[-1])
 
-fig, ax = plt.subplots(2,1,figsize=(15, 7), layout='constrained')
+fig, ax = plt.subplots(3,1,figsize=(15, 7), layout='constrained')
 
 new_av = []
 
@@ -164,6 +166,20 @@ ax[1].set_title("q - t")  # Add a title to the axes.
 ax[1].legend()
 ax[1].set_xlim(0,300)
 ax[1].set_ylim(-1,1)
+
+Mx, My, Mz = zip(*(torque))
+Mx, My, Mz = unveal(Mx), unveal(My), unveal(Mz)
+
+ax[2].plot(time, Mx, label = 'M_x')
+ax[2].plot(time, My, label = 'M_y')
+ax[2].plot(time, Mz, label = 'M_z')
+ax[2].set_xlabel('time(s)')  # Add an x-label to the axes.
+ax[2].set_ylabel('torque(Ns)')  # Add a y-label to the axes.
+ax[2].set_title("M - t")  # Add a title to the axes.
+ax[2].legend();  # Add a legend.
+ax[2].set_xlim(0,300)
+
+
 
 plt.savefig('w and q')
 
